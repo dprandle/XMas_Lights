@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file>icons/hammer.png</file>
+    <file>icons/pause.png</file>
+    <file>icons/stop.png</file>
+    <file>icons/play.png</file>
+  </qresource>
+  <qresource prefix="/graphics">
+    <file alias="lightbulb">graphics/lightbulb.png</file>
+    <file alias="lightbulb_lighting">graphics/lightbulb_lighting.png</file>
+  </qresource>
+</RCC>
