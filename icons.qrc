@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="/icons">
+    <file>icons/wifi.png</file>
     <file>icons/hammer.png</file>
     <file>icons/pause.png</file>
     <file>icons/stop.png</file>

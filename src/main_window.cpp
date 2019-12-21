@@ -12,11 +12,24 @@
 //#include <DspFilters/Filter.h>
 #include <DspFilters/Dsp.h>
 
+#include <QTcpSocket>
 #include <QFileDialog>
 #include <QSpinBox>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsScene>
+#include <QHostAddress>
+
+uint32_t hash_id(const std::string & strng)
+{
+	uint32_t hash = 5381;
+	int32_t c;
+	const char * str = strng.c_str();
+    while ((c = *str++))
+		hash = ((hash << 5) + hash) + c;
+
+	return hash;
+}
 
 Main_Window * Main_Window::this_ = nullptr;
 
@@ -28,7 +41,8 @@ Main_Window::Main_Window(QWidget * parent)
       channel_(nullptr),
       sample_count_(new QSpinBox),
       scene_(new QGraphicsScene),
-      pause_elapsed_(0)
+      pause_elapsed_(0),
+      ed_socket_(new QTcpSocket)
 {
     this_ = this;
     ui->setupUi(this);
@@ -42,6 +56,10 @@ Main_Window::Main_Window(QWidget * parent)
     lwidgets.push_back(ui->widget_s6);
     setup_light_graphics_();
     connect(&sim_sig_timer_, &QTimer::timeout, this, &Main_Window::run_sample);
+
+    connect(ed_socket_, &QTcpSocket::readyRead, this, &Main_Window::socket_data_available);
+    connect(ed_socket_, qOverload<QAbstractSocket::SocketError>(&QTcpSocket::error), this, &Main_Window::socket_error);
+    connect(ed_socket_, &QTcpSocket::connected, this, &Main_Window::socket_connected);
 }
 
 void Main_Window::run_sample()
@@ -55,9 +73,48 @@ void Main_Window::run_sample()
 
     for (uint8_t li = 0; li < LIGHT_COUNT; ++li)
     {
-        int light_val = light_data_.lights[li].ms_data[index].lvl;
+        int light_val = light_data_.lights[li].ms_data[index];
         double opacity = light_val / 10.0;
         lights[li]->setOpacity(opacity);
+    }
+}
+
+void Main_Window::socket_data_available()
+{}
+
+void Main_Window::socket_error(QAbstractSocket::SocketError err)
+{
+    statusBar()->showMessage("Socket error!: " + ed_socket_->errorString(),5000);
+}
+
+void Main_Window::socket_connected()
+{
+    qDebug() << "Connected!!";
+    statusBar()->showMessage("Connected to " + ed_socket_->peerAddress().toString() + ":10000!!!",5000);
+}
+
+void Main_Window::connect_to_edison()
+{
+    QString host = "XMAS_Lights.local";
+    ed_socket_->connectToHost(host, 10000);
+    statusBar()->showMessage("Trying to connect to " + host + " on port 10000");
+}
+
+void Main_Window::disconnect_from_edison()
+{
+    ed_socket_->disconnectFromHost();
+    statusBar()->showMessage("Disconnecting from " + ed_socket_->peerAddress().toString() + ":10000", 5000);
+}
+
+void Main_Window::on_actionEstablish_Connection_triggered()
+{
+    if (ui->actionEstablish_Connection->isChecked())
+    {
+        connect_to_edison();
+    }
+    else
+    {
+        disconnect_from_edison();
     }
 }
 
@@ -65,6 +122,10 @@ void Main_Window::on_actionStart_Simulation_triggered()
 {
     if (!sim_sig_timer_.isActive())
     {
+        Packet_ID id = {};
+        id.hashed_id = hash_id(PACKET_ID_PLAY);
+        ed_socket_->write((char*)id.data, PACKET_ID_SIZE);
+
         sim_timer_.restart();
         sim_sig_timer_.start();
     }
@@ -76,6 +137,10 @@ void Main_Window::on_actionPause_Simulation_triggered()
 {
     if (sim_sig_timer_.isActive())
     {
+        Packet_ID id = {};
+        id.hashed_id = hash_id(PACKET_ID_PAUSE);
+        ed_socket_->write((char*)id.data, PACKET_ID_SIZE);
+
         sim_sig_timer_.stop();
         pause_elapsed_ += sim_timer_.elapsed();
     }
@@ -87,6 +152,11 @@ void Main_Window::on_actionStop_Simulation_triggered()
 {
     pause_elapsed_ = 0;
     sim_sig_timer_.stop();
+
+    Packet_ID id = {};
+    id.hashed_id = hash_id(PACKET_ID_STOP);
+    ed_socket_->write((char*)id.data, PACKET_ID_SIZE);
+
     ui->actionPause_Simulation->setChecked(false);
     ui->actionStart_Simulation->setChecked(false);
     for (uint8_t li = 0; li < LIGHT_COUNT; ++li)
@@ -117,7 +187,8 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
                 double cur_ms = si % uint32_t(tinf.period);
                 //std::cout << "Cur milliseconds: " << cur_ms << std::endl;
 
-                double ramp_up_perc = (cur_ms - (tinf.period - (tinf.ramp_up + 1))) / (tinf.ramp_up + 1);
+                double ramp_up_perc =
+                    (cur_ms - (tinf.period - (tinf.ramp_up + 1))) / (tinf.ramp_up + 1);
                 ramp_up_perc = std::clamp(ramp_up_perc, 0.0, 1.0);
                 //std::cout << "Ramp up perc: " << ramp_up_perc << std::endl;
 
@@ -134,14 +205,24 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
             rounded_int = std::clamp(rounded_int, LIGHT_LEVEL_MIN, LIGHT_LEVEL_MAX);
             //std::cout << "Rounded int: " << int(rounded_int) << std::endl;
             std::cout << std::endl;
-            light_data_.lights[i].ms_data[si].lvl = rounded_int;
+            light_data_.lights[i].ms_data[si] = rounded_int;
         }
+    }
+
+    Packet_ID id = {};
+    id.hashed_id = hash_id(PACKET_ID_CONFIGURE);
+    ed_socket_->write((char*)id.data, PACKET_ID_SIZE);
+    ed_socket_->write((char*)light_data_.data, PACKET_ID_SIZE);
+    for (uint32_t i = 0; i < LIGHT_COUNT; ++i)
+    {
+        ed_socket_->write((char*)light_data_.lights[i].ms_data.data(), light_data_.sample_cnt);
     }
 }
 
 Main_Window::~Main_Window()
 {
     delete ui;
+    delete ed_socket_;
 }
 
 Main_Window & Main_Window::inst()
@@ -276,12 +357,12 @@ void Main_Window::setup_light_graphics_()
     fnt.setBold(true);
     fnt.setPointSize(32);
 
-    scene_->setBackgroundBrush(QColor(20,20,20));
+    scene_->setBackgroundBrush(QColor(20, 20, 20));
 
     double scaled_width = 512.0 * LIGHT_SCALE_FACTOR;
     for (uint8_t i = 0; i < LIGHT_COUNT; ++i)
     {
-        QGraphicsPixmapItem * l = scene_->addPixmap(pix_light);    
+        QGraphicsPixmapItem * l = scene_->addPixmap(pix_light);
         QGraphicsPixmapItem * ll = scene_->addPixmap(pix_light_lighting);
         l->setTransformationMode(Qt::SmoothTransformation);
         ll->setTransformationMode(Qt::SmoothTransformation);
@@ -294,12 +375,13 @@ void Main_Window::setup_light_graphics_()
         ll->setX(i * scaled_width + LIGHT_PADDING);
         lights.push_back(ll);
 
-        QGraphicsTextItem * titem = scene_->addText("L" + QString::number(i+1),fnt);
+        QGraphicsTextItem * titem = scene_->addText("L" + QString::number(i + 1), fnt);
         titem->setDefaultTextColor(Qt::white);
-        titem->setX(i * scaled_width + LIGHT_PADDING + scaled_width * 0.5 - titem->boundingRect().width() / 2);
+        titem->setX(i * scaled_width + LIGHT_PADDING + scaled_width * 0.5 -
+                    titem->boundingRect().width() / 2);
         titem->setY(50);
     }
-    
+
     //scene_->addRect()
     ui->graphicsView->setScene(scene_);
 }

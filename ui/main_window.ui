@@ -93,6 +93,7 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
+   <addaction name="actionEstablish_Connection"/>
    <addaction name="actionRebuild_Light_Data"/>
    <addaction name="separator"/>
    <addaction name="actionStart_Simulation"/>
@@ -217,6 +218,21 @@
    </property>
    <property name="toolTip">
     <string>Rebuild the light data values from </string>
+   </property>
+  </action>
+  <action name="actionEstablish_Connection">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../icons.qrc">
+     <normaloff>:/icons/icons/wifi.png</normaloff>:/icons/icons/wifi.png</iconset>
+   </property>
+   <property name="text">
+    <string>Establish Connection</string>
+   </property>
+   <property name="toolTip">
+    <string>Establish Connection to Edison</string>
    </property>
   </action>
  </widget>
