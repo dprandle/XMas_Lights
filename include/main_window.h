@@ -4,10 +4,12 @@
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QAbstractSocket>
+#include <cmath>
 
 const uint8_t LIGHT_COUNT = 6;
-const uint8_t LIGHT_LEVEL_MIN = 0;
-const uint8_t LIGHT_LEVEL_MAX = 10;
+const double LIGHT_LEVEL_MIN = 0.0;
+const double LIGHT_LEVEL_MAX = 100.0;
+
 const uint8_t LIGHT_PADDING = 20;
 const double LIGHT_SCALE_FACTOR = 0.37;
 const std::string PACKET_ID_PLAY = "Play";
@@ -15,6 +17,13 @@ const std::string PACKET_ID_PAUSE = "Pause";
 const std::string PACKET_ID_STOP = "Stop";
 const std::string PACKET_ID_CONFIGURE = "Configure";
 const uint8_t PACKET_ID_SIZE = 4;
+const double EPS = 0.000001;
+
+template <class T>
+bool fcompare(T left, T right)
+{
+    return fabs(left - right) <= EPS;
+}
 
 struct Packet_ID
 {
@@ -40,6 +49,15 @@ class Channel;
 struct Light_Info
 {
     std::vector<uint8_t> ms_data;
+};
+
+struct Filter_State_Info
+{
+    double release;
+    double hold;
+    double frame_contrib_hold;
+    bool open_squelch;
+    QVector<double> window_rms_vals;
 };
 
 struct Automation_Data
@@ -72,6 +90,8 @@ class Main_Window : public QMainWindow
 
     void terminate();
 
+    void normalize_samples(int16_t * channel, QVector<double> & dest, uint32_t offset=0, uint32_t subsize=0);
+
     static Main_Window & inst();
 
     Automation_Data * get_automation_data();
@@ -81,6 +101,16 @@ class Main_Window : public QMainWindow
     void connect_to_edison();
 
     void disconnect_from_edison();
+
+    void save_config_to_file(const QString & filename);
+
+    void load_config_from_file(const QString & filename);
+
+    uint32_t get_sample_count();
+
+    void load_audio_data();
+
+    FMOD::System * get_audio_system();
 
   public slots:
     void on_actionOpen_Audio_File_triggered();
@@ -95,6 +125,10 @@ class Main_Window : public QMainWindow
 
     void on_actionEstablish_Connection_triggered();
 
+    void on_actionSave_Configuration_triggered();
+
+    void on_actionLoad_Configuration_triggered();
+
   private:
     void socket_data_available();
     void socket_error(QAbstractSocket::SocketError);
@@ -104,10 +138,12 @@ class Main_Window : public QMainWindow
 
     static Main_Window * this_;
     Ui::Main_Window * ui;
+    
     FMOD::System * audio_system_;
     FMOD::Sound * sound_;
     FMOD::Channel * channel_;
-    QSpinBox * sample_count_;
+    uint32_t sample_count;
+
     QGraphicsScene * scene_;
     Automation_Data light_data_;
     QVector<Light_Strand_Widget*> lwidgets;
@@ -116,6 +152,7 @@ class Main_Window : public QMainWindow
     QTimer sim_sig_timer_;
     uint32_t pause_elapsed_;
     QTcpSocket * ed_socket_;
+    QString song_fname;
 };
 
 #define mwin Main_Window::inst()

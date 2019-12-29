@@ -6,46 +6,63 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>280</width>
-    <height>324</height>
+    <width>364</width>
+    <height>699</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="spacing">
-    <number>0</number>
-   </property>
-   <property name="leftMargin">
-    <number>1</number>
-   </property>
-   <property name="topMargin">
-    <number>1</number>
-   </property>
-   <property name="rightMargin">
-    <number>1</number>
-   </property>
-   <property name="bottomMargin">
-    <number>1</number>
-   </property>
    <item>
-    <layout class="QFormLayout" name="formLayout">
-     <property name="horizontalSpacing">
-      <number>9</number>
+    <widget class="QLabel" name="label_19">
+     <property name="styleSheet">
+      <string notr="true">background-color: rgb(52, 120, 10);
+color: rgb(255, 255, 255);
+font-size: 10pt;
+font-weight: bold;</string>
      </property>
-     <property name="verticalSpacing">
-      <number>9</number>
+     <property name="text">
+      <string>Filter</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QFormLayout" name="formLayout_2">
+     <property name="horizontalSpacing">
+      <number>6</number>
      </property>
      <item row="0" column="0">
-      <widget class="QLabel" name="label">
+      <widget class="QLabel" name="label_14">
        <property name="text">
-        <string>Filter type</string>
+        <string>Source Type</string>
        </property>
       </widget>
      </item>
      <item row="0" column="1">
-      <widget class="QComboBox" name="comboBox_filter_type"/>
+      <widget class="QComboBox" name="comboBox_source">
+       <property name="currentIndex">
+        <number>2</number>
+       </property>
+       <item>
+        <property name="text">
+         <string>Mono (Left)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Mono (Right)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Stereo</string>
+        </property>
+       </item>
+      </widget>
      </item>
      <item row="1" column="0">
       <widget class="QLabel" name="label_2">
@@ -54,92 +71,455 @@
        </property>
       </widget>
      </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Duration (s)</string>
+     <item row="1" column="1">
+      <widget class="QSpinBox" name="spinBox_init_delay">
+       <property name="maximum">
+        <number>600000</number>
        </property>
       </widget>
      </item>
-     <item row="1" column="1">
-      <widget class="QSpinBox" name="spinBox_init_delay"/>
-     </item>
-     <item row="2" column="1">
-      <widget class="QSpinBox" name="spinBox_duration"/>
-     </item>
      <item row="3" column="0">
-      <widget class="QLabel" name="label_4">
+      <widget class="QLabel" name="label_6">
+       <property name="toolTip">
+        <string>The threshold associated with the minimum intensity</string>
+       </property>
        <property name="text">
-        <string>Center freq (Hz)</string>
+        <string>Threshold Min (dB)</string>
        </property>
       </widget>
      </item>
      <item row="3" column="1">
-      <widget class="QSpinBox" name="spinBox_center_freq"/>
+      <widget class="QSpinBox" name="spinBox_min_threshold">
+       <property name="minimum">
+        <number>-100</number>
+       </property>
+       <property name="maximum">
+        <number>0</number>
+       </property>
+      </widget>
      </item>
      <item row="4" column="0">
-      <widget class="QLabel" name="label_5">
+      <widget class="QLabel" name="label_7">
+       <property name="toolTip">
+        <string>The threshold associated with the max intensity</string>
+       </property>
        <property name="text">
-        <string>Bandwidth (Hz)</string>
+        <string>Threshold Max (dB)</string>
        </property>
       </widget>
      </item>
      <item row="4" column="1">
-      <widget class="QSpinBox" name="spinBox_bandwidth"/>
+      <widget class="QSpinBox" name="spinBox_max_threshold">
+       <property name="minimum">
+        <number>-100</number>
+       </property>
+       <property name="maximum">
+        <number>0</number>
+       </property>
+      </widget>
      </item>
      <item row="5" column="0">
-      <widget class="QLabel" name="label_6">
+      <widget class="QLabel" name="label_11">
+       <property name="toolTip">
+        <string>Once threshold is engaged, how many dB the audio needs to drop before the sqeulch closes</string>
+       </property>
        <property name="text">
-        <string>Open threshold (dB)</string>
+        <string>Hysterysis</string>
        </property>
       </widget>
      </item>
      <item row="5" column="1">
-      <widget class="QSpinBox" name="spinBox_open_threshold"/>
+      <widget class="QSpinBox" name="spinBox_hysterysis">
+       <property name="maximum">
+        <number>100</number>
+       </property>
+      </widget>
      </item>
      <item row="6" column="0">
-      <widget class="QLabel" name="label_7">
+      <widget class="QLabel" name="label_12">
+       <property name="toolTip">
+        <string>Minimum light intensity when threshold first opens</string>
+       </property>
        <property name="text">
-        <string>Close threshold (dB)</string>
+        <string>Min Intensity</string>
        </property>
       </widget>
-     </item>
-     <item row="6" column="1">
-      <widget class="QSpinBox" name="spinBox"/>
-     </item>
-     <item row="8" column="0">
-      <widget class="QLabel" name="label_8">
-       <property name="text">
-        <string>Attack (ms)</string>
-       </property>
-      </widget>
-     </item>
-     <item row="9" column="0">
-      <widget class="QLabel" name="label_9">
-       <property name="text">
-        <string>Release (ms)</string>
-       </property>
-      </widget>
-     </item>
-     <item row="8" column="1">
-      <widget class="QSpinBox" name="spinBox_2"/>
-     </item>
-     <item row="9" column="1">
-      <widget class="QSpinBox" name="spinBox_3"/>
      </item>
      <item row="7" column="0">
+      <widget class="QLabel" name="label_13">
+       <property name="toolTip">
+        <string>Maximum light intensity when threshold is fully engaged</string>
+       </property>
+       <property name="text">
+        <string>Max Intensity</string>
+       </property>
+      </widget>
+     </item>
+     <item row="8" column="0">
       <widget class="QLabel" name="label_10">
+       <property name="toolTip">
+        <string>Minimum time the squelch will remain open once engaged</string>
+       </property>
        <property name="text">
         <string>Hold (ms)</string>
        </property>
       </widget>
      </item>
+     <item row="8" column="1">
+      <widget class="QSpinBox" name="spinBox_hold">
+       <property name="maximum">
+        <number>600000</number>
+       </property>
+       <property name="value">
+        <number>100</number>
+       </property>
+      </widget>
+     </item>
+     <item row="9" column="0">
+      <widget class="QLabel" name="label_8">
+       <property name="toolTip">
+        <string>The look ahead time to start ramping up the lights linearly until the min threshold level is reached</string>
+       </property>
+       <property name="text">
+        <string>Attack (ms)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="9" column="1">
+      <widget class="QSpinBox" name="spinBox_attack">
+       <property name="maximum">
+        <number>600000</number>
+       </property>
+      </widget>
+     </item>
+     <item row="10" column="0">
+      <widget class="QLabel" name="label_9">
+       <property name="toolTip">
+        <string>The time the lights will linearly decrease from the min intensity value to 0</string>
+       </property>
+       <property name="text">
+        <string>Release (ms)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="10" column="1">
+      <widget class="QSpinBox" name="spinBox_release">
+       <property name="maximum">
+        <number>600000</number>
+       </property>
+      </widget>
+     </item>
+     <item row="11" column="0">
+      <widget class="QLabel" name="label_15">
+       <property name="toolTip">
+        <string>The size of the window (in ms) that the audio should be averaged over when taking threshold values</string>
+       </property>
+       <property name="text">
+        <string>Window Size (ms)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="11" column="1">
+      <widget class="QSpinBox" name="spinBox_win_size">
+       <property name="minimum">
+        <number>1</number>
+       </property>
+       <property name="maximum">
+        <number>60000</number>
+       </property>
+       <property name="singleStep">
+        <number>1</number>
+       </property>
+       <property name="value">
+        <number>10</number>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_18">
+       <property name="text">
+        <string>Duration (ms)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QSpinBox" name="spinBox_duration">
+       <property name="maximum">
+        <number>600000</number>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="1">
+      <widget class="QDoubleSpinBox" name="doubleSpinBox_min_int">
+       <property name="maximum">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
+      </widget>
+     </item>
      <item row="7" column="1">
-      <widget class="QSpinBox" name="spinBox_hold"/>
+      <widget class="QDoubleSpinBox" name="doubleSpinBox_max_int">
+       <property name="maximum">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>
+   <item>
+    <layout class="QFormLayout" name="formLayout">
+     <item row="0" column="0">
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Filter type</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QComboBox" name="comboBox_filter_type">
+       <item>
+        <property name="text">
+         <string>Butterworth Low Pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Butterworth High Pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Butterworth Band Pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>ChebyshevI Low Pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>ChebyshevI High Pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>ChebyshevI Band Pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>ChebyshevII Low Pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>ChebyshevII High Pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>ChebyshevII Band Pass</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_center_freq">
+       <property name="text">
+        <string>Center or Cutoff (Hz)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QSpinBox" name="spinBox_center_freq">
+       <property name="maximum">
+        <number>20000</number>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="label_bw">
+       <property name="text">
+        <string>Bandwidth (Hz)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QSpinBox" name="spinBox_bandwidth">
+       <property name="maximum">
+        <number>10000</number>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="label_22">
+       <property name="text">
+        <string>Order</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QSpinBox" name="spinBox_order">
+       <property name="minimum">
+        <number>1</number>
+       </property>
+       <property name="maximum">
+        <number>10</number>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="0">
+      <widget class="QLabel" name="label_sb_ripple">
+       <property name="text">
+        <string>Stop Band Ripple (dB)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="1">
+      <widget class="QSpinBox" name="spinBox_sb_ripple"/>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="gridLayout">
+     <item row="1" column="1">
+      <widget class="QDoubleSpinBox" name="doubleSpinBox_avg">
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="buttonSymbols">
+        <enum>QAbstractSpinBox::NoButtons</enum>
+       </property>
+       <property name="minimum">
+        <double>-120.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>120.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0">
+      <widget class="QLabel" name="label_20">
+       <property name="text">
+        <string>Min (dB)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QDoubleSpinBox" name="doubleSpinBox_min">
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="buttonSymbols">
+        <enum>QAbstractSpinBox::NoButtons</enum>
+       </property>
+       <property name="minimum">
+        <double>-120.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>120.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Avg (dB)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="2">
+      <widget class="QLabel" name="label_21">
+       <property name="text">
+        <string>Max (dB)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="3">
+      <widget class="QDoubleSpinBox" name="doubleSpinBox_max">
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="buttonSymbols">
+        <enum>QAbstractSpinBox::NoButtons</enum>
+       </property>
+       <property name="minimum">
+        <double>-120.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>120.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="3">
+      <widget class="QDoubleSpinBox" name="doubleSpinBox_sd">
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="buttonSymbols">
+        <enum>QAbstractSpinBox::NoButtons</enum>
+       </property>
+       <property name="minimum">
+        <double>-120.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>120.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="2">
+      <widget class="QLabel" name="label_17">
+       <property name="text">
+        <string>Std Dev (dB)</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_16">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="pushButton_preview">
+     <property name="text">
+      <string>Preview</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="pushButton_delete">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>35</height>
+      </size>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: rgb(255, 255, 255);
+background-color: rgb(162, 6, 6);
+font-size: 10pt;
+font-weight: bold;</string>
+     </property>
+     <property name="text">
+      <string>Delete</string>
+     </property>
+    </widget>
+   </item>
   </layout>
+  <zorder>label_16</zorder>
+  <zorder>pushButton_preview</zorder>
+  <zorder>pushButton_delete</zorder>
+  <zorder>label_19</zorder>
  </widget>
  <resources/>
  <connections/>

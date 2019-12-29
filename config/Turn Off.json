@@ -1,0 +1,34 @@
+{
+    "Light_Widget[0]": {
+        "Timers": [
+            {
+                "duration": 5000,
+                "hold": 0,
+                "period": 1000,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "start_delay": 0
+            }
+        ]
+    },
+    "Light_Widget[1]": {
+        "Timers": [
+        ]
+    },
+    "Light_Widget[2]": {
+        "Timers": [
+        ]
+    },
+    "Light_Widget[3]": {
+        "Timers": [
+        ]
+    },
+    "Light_Widget[4]": {
+        "Timers": [
+        ]
+    },
+    "Light_Widget[5]": {
+        "Timers": [
+        ]
+    }
+}

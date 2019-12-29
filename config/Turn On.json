@@ -1,0 +1,66 @@
+{
+    "Light_Widget[0]": {
+        "Timers": [
+            {
+                "duration": 5000,
+                "hold": 1000,
+                "period": 1000,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "start_delay": 0
+            }
+        ]
+    },
+    "Light_Widget[1]": {
+        "Timers": [
+            {
+                "duration": 5000,
+                "hold": 1000,
+                "period": 1000,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "start_delay": 0
+            }
+        ]
+    },
+    "Light_Widget[2]": {
+        "Timers": [
+            {
+                "duration": 5000,
+                "hold": 1000,
+                "period": 1000,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "start_delay": 0
+            }
+        ]
+    },
+    "Light_Widget[3]": {
+        "Timers": [
+            {
+                "duration": 5000,
+                "hold": 1000,
+                "period": 1000,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "start_delay": 0
+            }
+        ]
+    },
+    "Light_Widget[4]": {
+        "Timers": [
+            {
+                "duration": 5000,
+                "hold": 1000,
+                "period": 1000,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "start_delay": 0
+            }
+        ]
+    },
+    "Light_Widget[5]": {
+        "Timers": [
+        ]
+    }
+}

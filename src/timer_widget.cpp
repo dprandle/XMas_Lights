@@ -27,3 +27,13 @@ Timer_Info Timer_Widget::get_timer_info()
     tinf.start_delay = ui->spinBox_init_delay->value();
     return tinf;
 }
+
+void Timer_Widget::set_from_timer_info(const Timer_Info & inf)
+{
+     ui->spinBox_duration->setValue(inf.duration);
+     ui->spinBox_hold->setValue(inf.hold);
+     ui->spinBox_period->setValue(inf.period);
+     ui->spinBox_ramp_down->setValue(inf.ramp_down);
+     ui->spinBox_ramp_up->setValue(inf.ramp_up);
+     ui->spinBox_init_delay->setValue(inf.start_delay);
+}

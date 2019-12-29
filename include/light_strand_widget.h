@@ -1,17 +1,19 @@
 #pragma once
 #include <QWidget>
+#include <archive_common.h>
+#include <timer_widget.h>
+#include <filter_widget.h>
+#include <automate_widget.h>
 
 namespace Ui {
 class Light_Strand_Widget;
 }
 
-class Timer_Widget;
-class Filter_Widget;
-
 class Light_Strand_Widget : public QWidget
 {
    Q_OBJECT
-   
+   pup_friend(Light_Strand_Widget);
+
   public:
    
    explicit Light_Strand_Widget(QWidget *parent = 0);
@@ -19,12 +21,68 @@ class Light_Strand_Widget : public QWidget
 
    QVector<Timer_Widget*> get_timer_widgets();
 
+   QVector<Filter_Widget*> get_filter_widgets();
+
+   Timer_Widget * add_timer_wiget();
+
+   void delete_timer(int index);
+
+   Filter_Widget * add_filter_wiget();
+
+   void delete_filter(int index);
+
+   Automation_Widget * add_automation_wiget();
+
+   void delete_automation(int index);
+
+   uint32_t get_timer_max_duration();
+
    public slots:
+
    void on_pushButton_add_timer_clicked();
 
-   void timer_widget_deleted(int index);
-   
+   void on_pushButton_add_filter_clicked();
+
+   void on_pushButton_add_automation_clicked();
+
   private:
    Ui::Light_Strand_Widget * ui;
    QVector<Timer_Widget*> timer_widgets_;
+   QVector<Filter_Widget*> filter_widgets_;
 };
+
+pup_func(Light_Strand_Widget)
+{
+   QVector<Timer_Info> timers;
+   for (int i = 0; i < val.timer_widgets_.size(); ++i)
+      timers.push_back(val.timer_widgets_[i]->get_timer_info());
+   pack_unpack(ar, timers, var_info(info.name + QString(SPLIT_CHAR) + "Timers", info.params));
+   if (ar.io == PUP_IN)
+   {
+      while (!val.timer_widgets_.isEmpty())
+         val.delete_timer(0);
+      
+      for (int i = 0; i < timers.size(); ++i)
+      {
+         Timer_Widget * tw = val.add_timer_wiget();
+         tw->set_from_timer_info(timers[i]);
+      }
+   }
+
+   QVector<Filter_Info> filters;
+   for (int i = 0; i < val.filter_widgets_.size(); ++i)
+      filters.push_back(val.filter_widgets_[i]->get_filter_info());
+   pack_unpack(ar, filters, var_info(info.name + QString(SPLIT_CHAR) + "Filters", info.params));
+   if (ar.io == PUP_IN)
+   {
+      while (!val.filter_widgets_.isEmpty())
+         val.delete_filter(0);
+      
+      for (int i = 0; i < filters.size(); ++i)
+      {
+         Filter_Widget * fw = val.add_filter_wiget();
+         fw->set_from_filter_info(filters[i]);
+      }
+   }
+
+}

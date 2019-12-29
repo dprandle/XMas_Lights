@@ -1,6 +1,8 @@
 #include <main_window.h>
 #include <ui_main_window.h>
 #include <timer_widget.h>
+#include <json_archive.h>
+#include <filter_widget.h>
 
 #include <iostream>
 #include <algorithm>
@@ -12,6 +14,7 @@
 //#include <DspFilters/Filter.h>
 #include <DspFilters/Dsp.h>
 
+#include <QJsonDocument>
 #include <QTcpSocket>
 #include <QFileDialog>
 #include <QSpinBox>
@@ -22,13 +25,13 @@
 
 uint32_t hash_id(const std::string & strng)
 {
-	uint32_t hash = 5381;
-	int32_t c;
-	const char * str = strng.c_str();
+    uint32_t hash = 5381;
+    int32_t c;
+    const char * str = strng.c_str();
     while ((c = *str++))
-		hash = ((hash << 5) + hash) + c;
+        hash = ((hash << 5) + hash) + c;
 
-	return hash;
+    return hash;
 }
 
 Main_Window * Main_Window::this_ = nullptr;
@@ -39,15 +42,18 @@ Main_Window::Main_Window(QWidget * parent)
       audio_system_(nullptr),
       sound_(nullptr),
       channel_(nullptr),
-      sample_count_(new QSpinBox),
+      sample_count(0),
       scene_(new QGraphicsScene),
+      light_data_(),
+      lwidgets(),
+      lights(),
+      sim_timer_(),
+      sim_sig_timer_(),
       pause_elapsed_(0),
       ed_socket_(new QTcpSocket)
 {
     this_ = this;
     ui->setupUi(this);
-    sample_count_->setMaximum(INT_MAX);
-    ui->toolBar->insertWidget(ui->actionRebuild_Light_Data, sample_count_);
     lwidgets.push_back(ui->widget_s1);
     lwidgets.push_back(ui->widget_s2);
     lwidgets.push_back(ui->widget_s3);
@@ -58,23 +64,26 @@ Main_Window::Main_Window(QWidget * parent)
     connect(&sim_sig_timer_, &QTimer::timeout, this, &Main_Window::run_sample);
 
     connect(ed_socket_, &QTcpSocket::readyRead, this, &Main_Window::socket_data_available);
-    connect(ed_socket_, qOverload<QAbstractSocket::SocketError>(&QTcpSocket::error), this, &Main_Window::socket_error);
+    connect(ed_socket_,
+            qOverload<QAbstractSocket::SocketError>(&QTcpSocket::error),
+            this,
+            &Main_Window::socket_error);
     connect(ed_socket_, &QTcpSocket::connected, this, &Main_Window::socket_connected);
 }
 
 void Main_Window::run_sample()
 {
     uint32_t index = pause_elapsed_ + sim_timer_.elapsed();
-    if (index > light_data_.sample_cnt)
+    if (index >= light_data_.sample_cnt)
     {
-        on_actionStop_Simulation_triggered();
+        sim_timer_.restart();
         return;
     }
 
     for (uint8_t li = 0; li < LIGHT_COUNT; ++li)
     {
         int light_val = light_data_.lights[li].ms_data[index];
-        double opacity = light_val / 10.0;
+        double opacity = double(light_val) / LIGHT_LEVEL_MAX;
         lights[li]->setOpacity(opacity);
     }
 }
@@ -84,13 +93,14 @@ void Main_Window::socket_data_available()
 
 void Main_Window::socket_error(QAbstractSocket::SocketError err)
 {
-    statusBar()->showMessage("Socket error!: " + ed_socket_->errorString(),5000);
+    statusBar()->showMessage("Socket error!: " + ed_socket_->errorString(), 5000);
 }
 
 void Main_Window::socket_connected()
 {
     qDebug() << "Connected!!";
-    statusBar()->showMessage("Connected to " + ed_socket_->peerAddress().toString() + ":10000!!!",5000);
+    statusBar()->showMessage("Connected to " + ed_socket_->peerAddress().toString() + ":10000!!!",
+                             5000);
 }
 
 void Main_Window::connect_to_edison()
@@ -103,7 +113,8 @@ void Main_Window::connect_to_edison()
 void Main_Window::disconnect_from_edison()
 {
     ed_socket_->disconnectFromHost();
-    statusBar()->showMessage("Disconnecting from " + ed_socket_->peerAddress().toString() + ":10000", 5000);
+    statusBar()->showMessage(
+        "Disconnecting from " + ed_socket_->peerAddress().toString() + ":10000", 5000);
 }
 
 void Main_Window::on_actionEstablish_Connection_triggered()
@@ -120,32 +131,78 @@ void Main_Window::on_actionEstablish_Connection_triggered()
 
 void Main_Window::on_actionStart_Simulation_triggered()
 {
+    if (get_sample_count() == 0)
+    {
+        ui->actionStart_Simulation->setChecked(false);
+        statusBar()->showMessage("Can't play - no data loaded", 3000);
+        return;
+    }
+
     if (!sim_sig_timer_.isActive())
     {
-        Packet_ID id = {};
-        id.hashed_id = hash_id(PACKET_ID_PLAY);
-        ed_socket_->write((char*)id.data, PACKET_ID_SIZE);
-
         sim_timer_.restart();
         sim_sig_timer_.start();
     }
     ui->actionStart_Simulation->setChecked(true);
     ui->actionPause_Simulation->setChecked(false);
+
+    if (ed_socket_->state() != QAbstractSocket::ConnectedState)
+    {
+        statusBar()->showMessage("Not sending play message to edison - not connected", 3000);
+    }
+    else
+    {
+        Packet_ID id = {};
+        id.hashed_id = hash_id(PACKET_ID_PLAY);
+        ed_socket_->write((char *)id.data, PACKET_ID_SIZE);
+        statusBar()->showMessage("Sent play message to edison", 3000);
+    }
+
+    if (channel_ != nullptr)
+    {
+        bool is_playing = false;
+        channel_->isPlaying(&is_playing);
+        if (is_playing)
+        {
+            channel_->setPaused(false);
+            return;
+        }
+    }
+    if (sound_ != nullptr)
+        audio_system_->playSound(sound_, nullptr, false, &channel_);
 }
 
 void Main_Window::on_actionPause_Simulation_triggered()
 {
+    if (get_sample_count() == 0)
+    {
+        ui->actionPause_Simulation->setChecked(false);
+        statusBar()->showMessage("Can't pause - no data loaded", 3000);
+        return;
+    }
+
     if (sim_sig_timer_.isActive())
     {
-        Packet_ID id = {};
-        id.hashed_id = hash_id(PACKET_ID_PAUSE);
-        ed_socket_->write((char*)id.data, PACKET_ID_SIZE);
-
         sim_sig_timer_.stop();
         pause_elapsed_ += sim_timer_.elapsed();
     }
     ui->actionPause_Simulation->setChecked(true);
     ui->actionStart_Simulation->setChecked(false);
+
+    if (ed_socket_->state() != QAbstractSocket::ConnectedState)
+    {
+        statusBar()->showMessage("Not sending pause message to edison - not connected", 3000);
+    }
+    else
+    {
+        Packet_ID id = {};
+        id.hashed_id = hash_id(PACKET_ID_PAUSE);
+        ed_socket_->write((char *)id.data, PACKET_ID_SIZE);
+        statusBar()->showMessage("Sent pause message to edison", 3000);
+    }
+
+    if (channel_ != nullptr)
+        channel_->setPaused(true);
 }
 
 void Main_Window::on_actionStop_Simulation_triggered()
@@ -153,70 +210,236 @@ void Main_Window::on_actionStop_Simulation_triggered()
     pause_elapsed_ = 0;
     sim_sig_timer_.stop();
 
-    Packet_ID id = {};
-    id.hashed_id = hash_id(PACKET_ID_STOP);
-    ed_socket_->write((char*)id.data, PACKET_ID_SIZE);
-
     ui->actionPause_Simulation->setChecked(false);
     ui->actionStart_Simulation->setChecked(false);
     for (uint8_t li = 0; li < LIGHT_COUNT; ++li)
         lights[li]->setOpacity(0.0);
+
+    if (ed_socket_->state() != QAbstractSocket::ConnectedState)
+    {
+        statusBar()->showMessage("Not sending stop message to edison - not connected", 3000);
+    }
+    else
+    {
+        Packet_ID id = {};
+        id.hashed_id = hash_id(PACKET_ID_STOP);
+        ed_socket_->write((char *)id.data, PACKET_ID_SIZE);
+        statusBar()->showMessage("Sending stop message to edison", 3000);
+    }
+
+    if (channel_ != nullptr)
+        channel_->stop();
+}
+
+void Main_Window::normalize_samples(int16_t * channel,
+                                    QVector<double> & dest,
+                                    uint32_t offset,
+                                    uint32_t subsize)
+{
+    double max_15_val = pow(2, 15);
+    double max_16_val = pow(2, 16) - 1;
+
+    if (subsize == 0)
+        subsize = sample_count;
+
+    assert(sample_count >= (offset + subsize));
+
+    dest.resize(subsize);
+    for (uint32_t si = 0; si < subsize; ++si)
+        dest[si] = 2 * (double(channel[offset + si]) + max_15_val) / max_16_val - 1.0;
 }
 
 void Main_Window::on_actionRebuild_Light_Data_triggered()
 {
-    on_actionStop_Simulation_triggered();
-
-    light_data_.sample_cnt = sample_count_->value();
+    load_audio_data();
+    light_data_.sample_cnt = get_sample_count();
     for (uint8_t i = 0; i < LIGHT_COUNT; ++i)
     {
+        QVector<double> normalized_left;
+        QVector<double> normalized_right;
+        QVector<Filter_State_Info> filter_state;
         auto twidgets = lwidgets[i]->get_timer_widgets();
+        auto fwidgets = lwidgets[i]->get_filter_widgets();
+        filter_state.resize(fwidgets.size());
         light_data_.lights[i].ms_data.resize(light_data_.sample_cnt);
+
         for (uint32_t si = 0; si < light_data_.sample_cnt; ++si)
         {
-            double frame_inf = 0.0;
+            double timer_frame_contrib = 0.0;
             for (uint16_t ti = 0; ti < twidgets.size(); ++ti)
             {
                 Timer_Info tinf = twidgets[ti]->get_timer_info();
 
                 // If sample is before start delay or after duration disregard
-                if (si < tinf.start_delay || si > tinf.duration)
+                if ((si < tinf.start_delay) || (si > (tinf.duration + tinf.start_delay)) ||
+                    fcompare(tinf.period, 0.0))
                     continue;
 
                 // cur_ms should be the elapsed milliseconds in this period
-                double cur_ms = si % uint32_t(tinf.period);
-                //std::cout << "Cur milliseconds: " << cur_ms << std::endl;
+                double cur_ms = (si - uint32_t(tinf.start_delay)) % uint32_t(tinf.period);
+                // std::cout << "Cur milliseconds: " << cur_ms << std::endl;
 
                 double ramp_up_perc =
                     (cur_ms - (tinf.period - (tinf.ramp_up + 1))) / (tinf.ramp_up + 1);
                 ramp_up_perc = std::clamp(ramp_up_perc, 0.0, 1.0);
-                //std::cout << "Ramp up perc: " << ramp_up_perc << std::endl;
+                // std::cout << "Ramp up perc: " << ramp_up_perc << std::endl;
 
-                double ramp_down_and_hold = (cur_ms - tinf.hold) / (tinf.ramp_down + 1);
+                double ramp_down_and_hold = (cur_ms - (tinf.hold - 1)) / (tinf.ramp_down + 1);
                 ramp_down_and_hold = std::clamp(ramp_down_and_hold, 0.0, 1.0);
-                //std::cout << "Ramp down and hold perc: " << ramp_down_and_hold << std::endl;
+                // std::cout << "Ramp down and hold perc: " << ramp_down_and_hold << std::endl;
 
                 //std::cout << "Increase from ramp up: " << ramp_up_perc * LIGHT_LEVEL_MAX << std::endl;
                 //std::cout << "Increase from ramp down and hold: " << (1.0 - ramp_down_and_hold) * LIGHT_LEVEL_MAX << std::endl;
-                frame_inf += ramp_up_perc * LIGHT_LEVEL_MAX;
-                frame_inf += (1.0 - ramp_down_and_hold) * LIGHT_LEVEL_MAX;
+                timer_frame_contrib += (ramp_up_perc + (1.0 - ramp_down_and_hold));
             }
-            uint8_t rounded_int = std::lround(frame_inf);
-            rounded_int = std::clamp(rounded_int, LIGHT_LEVEL_MIN, LIGHT_LEVEL_MAX);
-            //std::cout << "Rounded int: " << int(rounded_int) << std::endl;
-            std::cout << std::endl;
+
+            double filter_frame_contrib = 0.0;
+            for (int fi = 0; fi < fwidgets.size(); ++fi)
+            {
+                Filter_Info finf = fwidgets[fi]->get_filter_info();
+
+                if (fi < finf.start_delay || fi > finf.duration)
+                    continue;
+
+                if ((si % uint32_t(finf.window_size)) == 0)
+                {
+                    // If we are running out of ms, adjust the window size to what's left
+                    if (si + finf.window_size > light_data_.sample_cnt)
+                        finf.window_size = light_data_.sample_cnt - si;
+
+                    normalize_samples(
+                        fwidgets[fi]->get_channels()[0], normalized_left, si * 44.1, finf.window_size * 44.1);
+                    normalize_samples(
+                        fwidgets[fi]->get_channels()[1], normalized_right, si * 44.1, finf.window_size * 44.1);
+                    
+
+                    double rms_value = 0.0;
+                    double total_size = 0.0;
+
+                    if (finf.use_left)
+                    {
+                        for (int li = 0; li < normalized_left.size(); ++li)
+                            rms_value += normalized_left[li] * normalized_left[li];
+                        total_size += normalized_left.size();
+                    }
+                    if (finf.use_right)
+                    {
+                        for (int ri = 0; ri < normalized_right.size(); ++ri)
+                            rms_value += normalized_right[ri] * normalized_right[ri];
+                        total_size += normalized_right.size();
+                    }
+
+                    rms_value /= total_size;
+                    rms_value = sqrt(rms_value);
+                    filter_state[fi].window_rms_vals.push_back(rms_value);
+
+                    double db_val = 20 * log10(rms_value);
+
+                    if (filter_state[fi].open_squelch)
+                    {
+                        if (db_val > (finf.min_threshold - finf.hysterysis))
+                        {
+                            // squelch to remain open
+  //                          std::cout << "Squelch remains opened" << std::endl;
+
+
+                            // Update the intensity with this window's rms
+                            double mult = (db_val - finf.min_threshold) /
+                                          (finf.max_threshold - finf.min_threshold);
+                            mult = std::clamp(mult, 0.0, 1.0);
+                            filter_state[fi].frame_contrib_hold =
+                                mult * (finf.max_intensity - finf.min_intensity) +
+                                finf.min_intensity;
+                        }
+                        else
+                        {
+                            // close the squelch
+//                            std::cout << "Squelch closed!" << std::endl;
+                            filter_state[fi].open_squelch = false;
+
+                            // squelch was open and now is closed - engage the hold time... if hold is zero then engage the release time
+                            filter_state[fi].hold = finf.hold;
+                            if (fcompare(finf.hold,0.0))
+                                filter_state[fi].release = finf.release;
+                        }
+                    }
+                    else
+                    {
+                        if (db_val > finf.min_threshold)
+                        {
+                            // squelch opened
+                            filter_state[fi].open_squelch = true;
+
+                            // Reset the hold and release incase they were engaged
+                            filter_state[fi].hold = 0;
+                            filter_state[fi].release = 0;
+
+                            // Set the intensity with this window's rms
+                            double mult = (db_val - finf.min_threshold) /
+                                          (finf.max_threshold - finf.min_threshold);
+                            mult = std::clamp(mult, 0.0, 1.0);
+                            filter_state[fi].frame_contrib_hold =
+                                mult * (finf.max_intensity - finf.min_intensity) +
+                                finf.min_intensity;
+                        }
+                        else
+                        {
+                            //std::cout << "Squelch remains closed" << std::endl;
+                        }
+                    }
+                }
+
+                if (filter_state[fi].open_squelch)
+                {
+                    filter_frame_contrib += filter_state[fi].frame_contrib_hold;
+                }
+                else if (filter_state[fi].hold > 0)
+                {
+                    filter_frame_contrib += filter_state[fi].frame_contrib_hold;
+                    filter_state[fi].hold -= 1.0;
+                    if (filter_state[fi].hold <= 0.0)
+                        filter_state[fi].release = finf.release;
+                }
+                else if (filter_state[fi].release > 0)
+                {
+                    filter_frame_contrib +=
+                        (double(filter_state[fi].release) / finf.release) * filter_state[fi].frame_contrib_hold;
+                    // std::cout << "Release engaged: " << filter_state[fi].release << " at value " << filter_frame_contrib << std::endl;
+                    filter_state[fi].release -= 1.0;
+                }
+                else
+                {
+                    filter_state[fi].frame_contrib_hold = 0;
+                }
+                
+                //std::cout << "Filter frame contrib:" << filter_frame_contrib << std::endl;
+            }
+            double total_contrib = timer_frame_contrib + filter_frame_contrib;
+            total_contrib = total_contrib * (LIGHT_LEVEL_MAX - LIGHT_LEVEL_MIN) + LIGHT_LEVEL_MIN;
+            total_contrib = std::clamp(total_contrib, LIGHT_LEVEL_MIN, LIGHT_LEVEL_MAX);
+            uint8_t rounded_int = std::lround(total_contrib);
             light_data_.lights[i].ms_data[si] = rounded_int;
         }
+
+        for (int fi = 0; fi < fwidgets.size(); ++fi)
+            fwidgets[fi]->calculate_statistics(filter_state[fi].window_rms_vals);
+    }
+
+    if (ed_socket_->state() != QAbstractSocket::ConnectedState)
+    {
+        statusBar()->showMessage("Not sending build to edison - not connected", 3000);
+        return;
     }
 
     Packet_ID id = {};
     id.hashed_id = hash_id(PACKET_ID_CONFIGURE);
-    ed_socket_->write((char*)id.data, PACKET_ID_SIZE);
-    ed_socket_->write((char*)light_data_.data, PACKET_ID_SIZE);
+    ed_socket_->write((char *)id.data, PACKET_ID_SIZE);
+    ed_socket_->write((char *)light_data_.data, PACKET_ID_SIZE);
     for (uint32_t i = 0; i < LIGHT_COUNT; ++i)
     {
-        ed_socket_->write((char*)light_data_.lights[i].ms_data.data(), light_data_.sample_cnt);
+        ed_socket_->write((char *)light_data_.lights[i].ms_data.data(), light_data_.sample_cnt);
     }
+    statusBar()->showMessage("Sent build to edison", 3000);
 }
 
 Main_Window::~Main_Window()
@@ -265,26 +488,31 @@ void Main_Window::initialize()
 void Main_Window::terminate()
 {}
 
-void Main_Window::on_actionOpen_Audio_File_triggered()
+void Main_Window::load_audio_data()
 {
-    QString fn = QFileDialog::getOpenFileName(
-        this, "Open Audio File", "../import", "Audio Files (*.wav *.mp3)");
-    audio_system_->createSound(fn.toUtf8().constData(), FMOD_DEFAULT, nullptr, &sound_);
-    //audio_system_->playSound(sound_, nullptr, false, &channel_);
+    if (song_fname.isEmpty())
+        return;
+
+    if (sound_ != nullptr)
+    {
+        sound_->release();
+        sound_ = nullptr;
+    }
+
+    audio_system_->createSound(song_fname.toUtf8().constData(), FMOD_DEFAULT, nullptr, &sound_);
 
     FMOD_SOUND_TYPE t;
     FMOD_SOUND_FORMAT f;
-    int channel_count = 0;
     int bits_per_sample = 0;
+    int32_t channel_count;
     sound_->getFormat(&t, &f, &channel_count, &bits_per_sample);
-    int bytes_per_sample = bits_per_sample / 8;
+    int32_t bytes_per_sample = bits_per_sample / 8;
 
-    unsigned int sample_count = 0;
-    unsigned int ms_count = 0;
+    uint32_t ms_count;
     sound_->getLength(&ms_count, FMOD_TIMEUNIT_MS);
     sound_->getLength(&sample_count, FMOD_TIMEUNIT_PCM);
 
-    unsigned int sample_rate = (uint64_t(sample_count) * 1000) / ms_count;
+    uint32_t sample_rate = (uint64_t(sample_count) * 1000) / ms_count;
 
     void * data = nullptr;
     unsigned int data_length = 0;
@@ -294,57 +522,34 @@ void Main_Window::on_actionOpen_Audio_File_triggered()
     uint64_t byte_count = sample_count * channel_count * bytes_per_sample;
     sound_->lock(0, byte_count, &data, &data_wrap, &data_length, &data_wrap_length);
     int16_t * data_fmt = reinterpret_cast<int16_t *>(data);
-    int16_t * channels[2];
-    int16_t * filtered_interleaved_audio = new int16_t[sample_count * channel_count];
 
-    channels[0] = new int16_t[sample_count];
-    channels[1] = new int16_t[sample_count];
-
-    for (unsigned int j = 0; j < sample_count; ++j)
+    for (int li = 0; li < lwidgets.size(); ++li)
     {
-        channels[0][j] = data_fmt[j];
-        channels[1][j] = data_fmt[j + 1];
+        auto fwidgets = lwidgets[li]->get_filter_widgets();
+        for (int fi = 0; fi < fwidgets.size(); ++fi)
+        {
+            int16_t ** channels = fwidgets[fi]->get_channels();
+            for (int i = 0; i < 2; ++i)
+            {
+                delete[] channels[i];
+                channels[i] = new int16_t[sample_count];
+            }
+
+            for (unsigned int j = 0; j < sample_count; ++j)
+            {
+                channels[0][j] = data_fmt[j];
+                channels[1][j] = data_fmt[j + 1];
+            }
+            fwidgets[fi]->filter_audio(sample_count, sample_rate, channel_count, byte_count);
+        }
     }
+    sound_->unlock(data, data_wrap, data_length, data_wrap_length);
+}
 
-    Dsp::SimpleFilter<Dsp::Butterworth::BandPass<100>, 2> filter;
-    filter.setup(10, sample_rate, 500, 300);
-    filter.process(sample_count, channels);
-
-    for (unsigned int j = 0; j < sample_count; ++j)
-    {
-        filtered_interleaved_audio[j] = channels[0][j];
-        filtered_interleaved_audio[j + 1] = channels[1][j];
-    }
-
-    FMOD::Sound * snd = nullptr;
-    FMOD_CREATESOUNDEXINFO info = {};
-    info.cbsize = sizeof(FMOD_CREATESOUNDEXINFO);
-    info.length = byte_count;
-    info.numchannels = 2;
-    info.defaultfrequency = 44100;
-    info.format = FMOD_SOUND_FORMAT_PCM16;
-    info.suggestedsoundtype = FMOD_SOUND_TYPE_WAV;
-    FMOD_RESULT res =
-        audio_system_->createSound(reinterpret_cast<const char *>(filtered_interleaved_audio),
-                                   FMOD_OPENMEMORY | FMOD_CREATESAMPLE | FMOD_OPENRAW,
-                                   &info,
-                                   &snd);
-    if (res != FMOD_OK)
-    {
-        printf("FMOD error! (%d) %s\n", res, FMOD_ErrorString(res));
-    }
-    audio_system_->playSound(snd, nullptr, false, &channel_);
-
-    using namespace std;
-    cout << "Channel count: " << channel_count << endl;
-    cout << "Bits per sample: " << bits_per_sample << endl;
-    cout << "Bytes per sample: " << bytes_per_sample << endl;
-    cout << "Sample rate: " << sample_rate << endl;
-    cout << "Sample count: " << sample_count << endl;
-    cout << "Length (s): " << ms_count / 60000.0 << endl;
-    cout << "Byte count: " << byte_count << endl;
-    cout << "Data length: " << data_length << endl;
-    cout << "Data wrap length: " << data_wrap_length << endl;
+void Main_Window::on_actionOpen_Audio_File_triggered()
+{
+    song_fname = QFileDialog::getOpenFileName(
+        this, "Open Audio File", "../import", "Audio Files (*.wav *.mp3)");
 }
 
 void Main_Window::setup_light_graphics_()
@@ -382,6 +587,97 @@ void Main_Window::setup_light_graphics_()
         titem->setY(50);
     }
 
-    //scene_->addRect()
     ui->graphicsView->setScene(scene_);
+}
+
+uint32_t Main_Window::get_sample_count()
+{
+    uint32_t max = 0;
+    for (int i = 0; i < lwidgets.size(); ++i)
+    {
+        uint32_t tmax = lwidgets[i]->get_timer_max_duration();
+        if (tmax > max)
+            max = tmax;
+    }
+
+    if (sound_ != nullptr)
+    {
+        uint32_t ms_count = 0;
+        sound_->getLength(&ms_count, FMOD_TIMEUNIT_MS);
+        if (ms_count > max)
+            max = ms_count;
+    }
+
+    return max;
+}
+
+void Main_Window::save_config_to_file(const QString & filename)
+{
+    if (filename.isEmpty())
+        return;
+    QFile json_file(filename);
+    if (json_file.open(QIODevice::WriteOnly))
+    {
+        QVariantMap vm;
+        variant_map_archive ar;
+        ar.io = PUP_OUT;
+        ar.top_level = &vm;
+        for (int i = 0; i < lwidgets.size(); ++i)
+        {
+            pack_unpack(ar, song_fname, var_info("song_fname", QVariantMap()));
+            pack_unpack(ar,
+                        *lwidgets[i],
+                        var_info("Light_Widget[" + QString::number(i) + "]", QVariantMap()));
+        }
+        QJsonDocument doc = QJsonDocument::fromVariant(vm);
+        json_file.write(doc.toJson());
+    }
+}
+
+void Main_Window::load_config_from_file(const QString & filename)
+{
+    if (filename.isEmpty())
+        return;
+    QFile json_file(filename);
+    if (json_file.open(QIODevice::ReadOnly))
+    {
+        QByteArray fdata(json_file.readAll());
+        QJsonDocument doc = QJsonDocument::fromJson(fdata);
+        QVariantMap vm = doc.toVariant().toMap();
+
+        variant_map_archive ar;
+        ar.io = PUP_IN;
+        ar.top_level = &vm;
+        for (int i = 0; i < lwidgets.size(); ++i)
+        {
+            pack_unpack(ar, song_fname, var_info("song_fname", QVariantMap()));
+            pack_unpack(ar,
+                        *lwidgets[i],
+                        var_info("Light_Widget[" + QString::number(i) + "]", QVariantMap()));
+        }
+    }
+}
+
+void Main_Window::on_actionSave_Configuration_triggered()
+{
+    QString fn = QFileDialog::getSaveFileName(this,
+                                              "Save Config File",
+                                              "/home/daniel/Documents/Code/XMas_Lights/config",
+                                              "Config Files (*.json)");
+    save_config_to_file(fn);
+}
+
+void Main_Window::on_actionLoad_Configuration_triggered()
+{
+    QString fn = QFileDialog::getOpenFileName(this,
+                                              "Open Config File",
+                                              "/home/daniel/Documents/Code/XMas_Lights/config",
+                                              "Config Files (*.json)");
+    load_config_from_file(fn);
+    on_actionRebuild_Light_Data_triggered();
+}
+
+FMOD::System * Main_Window::get_audio_system()
+{
+    return audio_system_;
 }
