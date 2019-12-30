@@ -24,6 +24,7 @@ struct Filter_Info
 {
     int ftype;
     int order;
+    bool enabled;
     double sb_ripple;
     double center_freq;
     double bandwidth;
@@ -77,6 +78,8 @@ class Filter_Widget : public QWidget
 
     void on_pushButton_delete_clicked();
 
+    void on_checkBox_enabled_stateChanged(int new_state);
+
   signals:
 
     void delete_me(int ind);
@@ -94,6 +97,7 @@ pup_func(Filter_Info)
 {
     pup_member(ftype);
     pup_member(order);
+    pup_member(enabled);
     pup_member(sb_ripple);
     pup_member(center_freq);
     pup_member(bandwidth);

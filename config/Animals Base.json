@@ -1,0 +1,78 @@
+{
+    "Light_Widget[0]": {
+        "Automation_Info": [
+            {
+                "enabled": true,
+                "hold_time": 10,
+                "key_code": 65,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "rec_mode": 1,
+                "record_armed": true
+            }
+        ],
+        "Filters": [
+        ],
+        "Timers": [
+        ]
+    },
+    "Light_Widget[1]": {
+        "Automation_Info": [
+            {
+                "enabled": true,
+                "hold_time": 10,
+                "key_code": 83,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "rec_mode": 1,
+                "record_armed": true
+            }
+        ],
+        "Filters": [
+        ],
+        "Timers": [
+        ]
+    },
+    "Light_Widget[2]": {
+        "Automation_Info": [
+            {
+                "enabled": true,
+                "hold_time": 10,
+                "key_code": 68,
+                "ramp_down": 0,
+                "ramp_up": 0,
+                "rec_mode": 1,
+                "record_armed": true
+            }
+        ],
+        "Filters": [
+        ],
+        "Timers": [
+        ]
+    },
+    "Light_Widget[3]": {
+        "Automation_Info": [
+        ],
+        "Filters": [
+        ],
+        "Timers": [
+        ]
+    },
+    "Light_Widget[4]": {
+        "Automation_Info": [
+        ],
+        "Filters": [
+        ],
+        "Timers": [
+        ]
+    },
+    "Light_Widget[5]": {
+        "Automation_Info": [
+        ],
+        "Filters": [
+        ],
+        "Timers": [
+        ]
+    },
+    "song_fname": "/home/daniel/Documents/Code/XMas_Lights/import/01 - Animals (Extended).wav"
+}

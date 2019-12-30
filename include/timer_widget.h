@@ -9,6 +9,7 @@ class Timer_Widget;
 
 struct Timer_Info
 {
+    bool enabled;
     double duration;
     double start_delay;
     double period;
@@ -34,6 +35,8 @@ class Timer_Widget : public QWidget
   public slots:
     void on_pushButton_delete_clicked();
 
+    void on_checkBox_enabled_stateChanged(int new_state);
+
   signals:
 
     void delete_me(int ind);
@@ -44,6 +47,7 @@ class Timer_Widget : public QWidget
 
 pup_func(Timer_Info)
 {
+    pup_member(enabled);
     pup_member(duration);
     pup_member(start_delay);
     pup_member(period);

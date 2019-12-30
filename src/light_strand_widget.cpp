@@ -27,6 +27,11 @@ QVector<Filter_Widget *> Light_Strand_Widget::get_filter_widgets()
     return filter_widgets_;
 }
 
+QVector<Automate_Widget *> Light_Strand_Widget::get_automation_widgets()
+{
+    return automate_widgets_;
+}
+
 void Light_Strand_Widget::delete_timer(int index)
 {
     Timer_Widget * cur_tw = timer_widgets_[index];
@@ -51,6 +56,18 @@ void Light_Strand_Widget::delete_filter(int index)
     delete cur_fw;
 }
 
+void Light_Strand_Widget::delete_automation(int index)
+{
+    Automate_Widget * cur_aw = automate_widgets_[index];
+    Automate_Widget * aw = automate_widgets_.last();
+    aw->index = index;
+    automate_widgets_[index] = aw;
+    automate_widgets_.pop_back();
+    QVBoxLayout * layout = static_cast<QVBoxLayout *>(ui->scrollArea->widget()->layout());
+    layout->removeWidget(cur_aw);
+    delete cur_aw;
+}
+
 uint32_t Light_Strand_Widget::get_timer_max_duration()
 {
     uint32_t max = 0;
@@ -66,7 +83,6 @@ uint32_t Light_Strand_Widget::get_timer_max_duration()
 Timer_Widget * Light_Strand_Widget::add_timer_wiget()
 {
     Timer_Widget * tw = new Timer_Widget(this);
-
     connect(tw, &Timer_Widget::delete_me, this, &Light_Strand_Widget::delete_timer);
     QVBoxLayout * layout = static_cast<QVBoxLayout *>(ui->scrollArea->widget()->layout());
     layout->insertWidget(0, tw);
@@ -86,9 +102,20 @@ Filter_Widget * Light_Strand_Widget::add_filter_wiget()
     return fw;
 }
 
+Automate_Widget * Light_Strand_Widget::add_automation_wiget()
+{
+    Automate_Widget * aw = new Automate_Widget(this);
+    connect(aw, &Automate_Widget::delete_me, this, &Light_Strand_Widget::delete_automation);
+    QVBoxLayout * layout = static_cast<QVBoxLayout *>(ui->scrollArea->widget()->layout());
+    layout->insertWidget(0, aw);
+    aw->index = automate_widgets_.size();
+    automate_widgets_.push_back(aw);
+    return aw;
+}
+
 void Light_Strand_Widget::on_pushButton_add_automation_clicked()
 {
-    
+    add_automation_wiget();
 }
 
 void Light_Strand_Widget::on_pushButton_add_timer_clicked()

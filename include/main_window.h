@@ -60,6 +60,13 @@ struct Filter_State_Info
     QVector<double> window_rms_vals;
 };
 
+struct Automation_State_Info
+{
+    double ramp_down;
+    double ramp_up;
+    double hold;
+};
+
 struct Automation_Data
 {
     union
@@ -77,6 +84,7 @@ class Light_Strand_Widget;
 class QGraphicsScene;
 class QGraphicsPixmapItem;
 class QTcpSocket;
+class QSlider;
 
 class Main_Window : public QMainWindow
 {
@@ -112,6 +120,16 @@ class Main_Window : public QMainWindow
 
     FMOD::System * get_audio_system();
 
+    bool is_key_pressed(int key);
+
+    void process_sample(int index);
+
+    void slider_pressed();
+
+    void slider_released();
+
+    void slider_value_changed();
+
   public slots:
     void on_actionOpen_Audio_File_triggered();
 
@@ -129,6 +147,14 @@ class Main_Window : public QMainWindow
 
     void on_actionLoad_Configuration_triggered();
 
+    void on_actionArm_Record_triggered();
+
+    protected:
+
+    void keyPressEvent(QKeyEvent *event);
+
+    void keyReleaseEvent(QKeyEvent *event);
+
   private:
     void socket_data_available();
     void socket_error(QAbstractSocket::SocketError);
@@ -143,8 +169,13 @@ class Main_Window : public QMainWindow
     FMOD::Sound * sound_;
     FMOD::Channel * channel_;
     uint32_t sample_count;
+    bool slider_pressed_;
+    bool was_playing_before_moving_slider_;
+
+    QMap<int, bool> keys_;
 
     QGraphicsScene * scene_;
+    QSlider * play_slider_;
     Automation_Data light_data_;
     QVector<Light_Strand_Widget*> lwidgets;
     QVector<QGraphicsPixmapItem*> lights;

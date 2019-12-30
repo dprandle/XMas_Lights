@@ -1,5 +1,9 @@
 <RCC>
   <qresource prefix="/icons">
+    <file>icons/speakers.png</file>
+    <file>icons/save-icon-silhouette.png</file>
+    <file>icons/open-folder.png</file>
+    <file>icons/recording.png</file>
     <file>icons/wifi.png</file>
     <file>icons/hammer.png</file>
     <file>icons/pause.png</file>

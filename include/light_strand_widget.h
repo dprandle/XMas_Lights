@@ -23,6 +23,8 @@ class Light_Strand_Widget : public QWidget
 
    QVector<Filter_Widget*> get_filter_widgets();
 
+   QVector<Automate_Widget*> get_automation_widgets();
+
    Timer_Widget * add_timer_wiget();
 
    void delete_timer(int index);
@@ -31,7 +33,7 @@ class Light_Strand_Widget : public QWidget
 
    void delete_filter(int index);
 
-   Automation_Widget * add_automation_wiget();
+   Automate_Widget * add_automation_wiget();
 
    void delete_automation(int index);
 
@@ -49,6 +51,7 @@ class Light_Strand_Widget : public QWidget
    Ui::Light_Strand_Widget * ui;
    QVector<Timer_Widget*> timer_widgets_;
    QVector<Filter_Widget*> filter_widgets_;
+   QVector<Automate_Widget*> automate_widgets_;
 };
 
 pup_func(Light_Strand_Widget)
@@ -82,6 +85,22 @@ pup_func(Light_Strand_Widget)
       {
          Filter_Widget * fw = val.add_filter_wiget();
          fw->set_from_filter_info(filters[i]);
+      }
+   }
+
+   QVector<Automation_Info> automation_data;
+   for (int i = 0; i < val.automate_widgets_.size(); ++i)
+      automation_data.push_back(val.automate_widgets_[i]->get_automation_info());
+   pack_unpack(ar, automation_data, var_info(info.name + QString(SPLIT_CHAR) + "Automation_Info", info.params));
+   if (ar.io == PUP_IN)
+   {
+      while (!val.automate_widgets_.isEmpty())
+         val.delete_automation(0);
+      
+      for (int i = 0; i < automation_data.size(); ++i)
+      {
+         Automate_Widget * aw = val.add_automation_wiget();
+         aw->set_from_automation_info(automation_data[i]);
       }
    }
 

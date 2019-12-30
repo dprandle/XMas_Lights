@@ -14,6 +14,7 @@
 //#include <DspFilters/Filter.h>
 #include <DspFilters/Dsp.h>
 
+#include <QKeyEvent>
 #include <QJsonDocument>
 #include <QTcpSocket>
 #include <QFileDialog>
@@ -22,6 +23,7 @@
 #include <QGraphicsTextItem>
 #include <QGraphicsScene>
 #include <QHostAddress>
+#include <QSlider>
 
 uint32_t hash_id(const std::string & strng)
 {
@@ -43,7 +45,9 @@ Main_Window::Main_Window(QWidget * parent)
       sound_(nullptr),
       channel_(nullptr),
       sample_count(0),
+      slider_pressed_(0),
       scene_(new QGraphicsScene),
+      play_slider_(new QSlider(Qt::Horizontal)),
       light_data_(),
       lwidgets(),
       lights(),
@@ -61,31 +65,112 @@ Main_Window::Main_Window(QWidget * parent)
     lwidgets.push_back(ui->widget_s5);
     lwidgets.push_back(ui->widget_s6);
     setup_light_graphics_();
-    connect(&sim_sig_timer_, &QTimer::timeout, this, &Main_Window::run_sample);
 
+    connect(&sim_sig_timer_, &QTimer::timeout, this, &Main_Window::run_sample);
     connect(ed_socket_, &QTcpSocket::readyRead, this, &Main_Window::socket_data_available);
     connect(ed_socket_,
             qOverload<QAbstractSocket::SocketError>(&QTcpSocket::error),
             this,
             &Main_Window::socket_error);
     connect(ed_socket_, &QTcpSocket::connected, this, &Main_Window::socket_connected);
+    connect(play_slider_, &QSlider::sliderPressed, this, &Main_Window::slider_pressed);
+    connect(play_slider_, &QSlider::sliderReleased, this, &Main_Window::slider_released);
+    connect(play_slider_, &QSlider::valueChanged, this, &Main_Window::slider_value_changed);
+
+
+    ui->toolBar->addWidget(play_slider_);
+    play_slider_->setMinimum(0);
+    play_slider_->setMaximum(0);
+    play_slider_->setTickInterval(1000);
+}
+
+void Main_Window::process_sample(int index)
+{
+    for (uint8_t li = 0; li < LIGHT_COUNT; ++li)
+    {
+        int light_val = light_data_.lights[li].ms_data[index];
+        double opacity = double(light_val) / LIGHT_LEVEL_MAX;
+
+        if (ui->actionArm_Record->isChecked())
+        {
+            auto awidgets = lwidgets[li]->get_automation_widgets();
+            for (int j = 0; j < awidgets.size(); ++j)
+            {
+                Automation_Info ainf = awidgets[j]->get_automation_info();
+                if (ainf.enabled && ainf.record_armed)
+                {
+                    if (is_key_pressed(ainf.key_code))
+                    {
+                        awidgets[j]->recorded_data[index] = 1.0;
+                        opacity = 1.0;
+                    }
+                    else if (ainf.rec_mode == REC_OVERWRITE)
+                    {
+                        awidgets[j]->recorded_data[index] = 0.0;
+                    }
+                }
+            }
+        }
+
+        lights[li]->setOpacity(opacity);
+    }
+}
+
+void Main_Window::slider_pressed()
+{
+    if (channel_ == nullptr)
+    {
+        on_actionStart_Simulation_triggered();
+        on_actionPause_Simulation_triggered();
+    }
+    
+    if (sim_sig_timer_.isActive())
+    {
+        on_actionPause_Simulation_triggered();
+        was_playing_before_moving_slider_ = true;
+    }
+    else
+    {
+        was_playing_before_moving_slider_ = false;
+    }
+    slider_pressed_ = true;
+}
+
+void Main_Window::slider_released()
+{
+    slider_pressed_ = false;
+    pause_elapsed_ = play_slider_->value();
+    if (was_playing_before_moving_slider_)
+    {
+        on_actionStart_Simulation_triggered();
+    }
+}
+
+void Main_Window::slider_value_changed()
+{
+    if (slider_pressed_)
+    {
+        uint32_t index = play_slider_->value();
+        process_sample(index);
+        if (channel_ != nullptr)
+        {
+            channel_->setPosition(index, FMOD_TIMEUNIT_MS);
+        }
+    }
 }
 
 void Main_Window::run_sample()
 {
     uint32_t index = pause_elapsed_ + sim_timer_.elapsed();
+
     if (index >= light_data_.sample_cnt)
     {
         sim_timer_.restart();
         return;
     }
 
-    for (uint8_t li = 0; li < LIGHT_COUNT; ++li)
-    {
-        int light_val = light_data_.lights[li].ms_data[index];
-        double opacity = double(light_val) / LIGHT_LEVEL_MAX;
-        lights[li]->setOpacity(opacity);
-    }
+    play_slider_->setValue(index);
+    process_sample(index);
 }
 
 void Main_Window::socket_data_available()
@@ -138,14 +223,6 @@ void Main_Window::on_actionStart_Simulation_triggered()
         return;
     }
 
-    if (!sim_sig_timer_.isActive())
-    {
-        sim_timer_.restart();
-        sim_sig_timer_.start();
-    }
-    ui->actionStart_Simulation->setChecked(true);
-    ui->actionPause_Simulation->setChecked(false);
-
     if (ed_socket_->state() != QAbstractSocket::ConnectedState)
     {
         statusBar()->showMessage("Not sending play message to edison - not connected", 3000);
@@ -156,7 +233,18 @@ void Main_Window::on_actionStart_Simulation_triggered()
         id.hashed_id = hash_id(PACKET_ID_PLAY);
         ed_socket_->write((char *)id.data, PACKET_ID_SIZE);
         statusBar()->showMessage("Sent play message to edison", 3000);
+        timespec sleep = {}, rm = {};
+        sleep.tv_nsec = 200000000;
+        nanosleep(&sleep, &rm);
     }
+
+    if (!sim_sig_timer_.isActive())
+    {
+        sim_timer_.restart();
+        sim_sig_timer_.start();
+    }
+    ui->actionStart_Simulation->setChecked(true);
+    ui->actionPause_Simulation->setChecked(false);
 
     if (channel_ != nullptr)
     {
@@ -208,6 +296,7 @@ void Main_Window::on_actionPause_Simulation_triggered()
 void Main_Window::on_actionStop_Simulation_triggered()
 {
     pause_elapsed_ = 0;
+    play_slider_->setValue(0);
     sim_sig_timer_.stop();
 
     ui->actionPause_Simulation->setChecked(false);
@@ -249,6 +338,29 @@ void Main_Window::normalize_samples(int16_t * channel,
         dest[si] = 2 * (double(channel[offset + si]) + max_15_val) / max_16_val - 1.0;
 }
 
+void Main_Window::keyPressEvent(QKeyEvent * event)
+{
+    auto fiter = keys_.find(event->key());
+    if (fiter != keys_.end())
+        fiter.value() = true;
+}
+
+bool Main_Window::is_key_pressed(int key)
+{
+    bool ret = false;
+    auto fiter = keys_.find(key);
+    if (fiter != keys_.end())
+        ret = fiter.value();
+    return ret;
+}
+
+void Main_Window::keyReleaseEvent(QKeyEvent * event)
+{
+    auto fiter = keys_.find(event->key());
+    if (fiter != keys_.end())
+        fiter.value() = false;
+}
+
 void Main_Window::on_actionRebuild_Light_Data_triggered()
 {
     load_audio_data();
@@ -258,9 +370,14 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
         QVector<double> normalized_left;
         QVector<double> normalized_right;
         QVector<Filter_State_Info> filter_state;
+        QVector<Automation_State_Info> automation_state;
         auto twidgets = lwidgets[i]->get_timer_widgets();
         auto fwidgets = lwidgets[i]->get_filter_widgets();
+        auto awidgets = lwidgets[i]->get_automation_widgets();
+
         filter_state.resize(fwidgets.size());
+        automation_state.resize(awidgets.size());
+
         light_data_.lights[i].ms_data.resize(light_data_.sample_cnt);
 
         for (uint32_t si = 0; si < light_data_.sample_cnt; ++si)
@@ -271,25 +388,18 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
                 Timer_Info tinf = twidgets[ti]->get_timer_info();
 
                 // If sample is before start delay or after duration disregard
-                if ((si < tinf.start_delay) || (si > (tinf.duration + tinf.start_delay)) ||
-                    fcompare(tinf.period, 0.0))
+                if (!tinf.enabled || (si < tinf.start_delay) ||
+                    (si > (tinf.duration + tinf.start_delay)) || fcompare(tinf.period, 0.0))
                     continue;
 
-                // cur_ms should be the elapsed milliseconds in this period
                 double cur_ms = (si - uint32_t(tinf.start_delay)) % uint32_t(tinf.period);
-                // std::cout << "Cur milliseconds: " << cur_ms << std::endl;
 
                 double ramp_up_perc =
                     (cur_ms - (tinf.period - (tinf.ramp_up + 1))) / (tinf.ramp_up + 1);
                 ramp_up_perc = std::clamp(ramp_up_perc, 0.0, 1.0);
-                // std::cout << "Ramp up perc: " << ramp_up_perc << std::endl;
 
                 double ramp_down_and_hold = (cur_ms - (tinf.hold - 1)) / (tinf.ramp_down + 1);
                 ramp_down_and_hold = std::clamp(ramp_down_and_hold, 0.0, 1.0);
-                // std::cout << "Ramp down and hold perc: " << ramp_down_and_hold << std::endl;
-
-                //std::cout << "Increase from ramp up: " << ramp_up_perc * LIGHT_LEVEL_MAX << std::endl;
-                //std::cout << "Increase from ramp down and hold: " << (1.0 - ramp_down_and_hold) * LIGHT_LEVEL_MAX << std::endl;
                 timer_frame_contrib += (ramp_up_perc + (1.0 - ramp_down_and_hold));
             }
 
@@ -298,7 +408,7 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
             {
                 Filter_Info finf = fwidgets[fi]->get_filter_info();
 
-                if (fi < finf.start_delay || fi > finf.duration)
+                if (!finf.enabled || (si < finf.start_delay) || (si >= finf.duration))
                     continue;
 
                 if ((si % uint32_t(finf.window_size)) == 0)
@@ -307,11 +417,14 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
                     if (si + finf.window_size > light_data_.sample_cnt)
                         finf.window_size = light_data_.sample_cnt - si;
 
-                    normalize_samples(
-                        fwidgets[fi]->get_channels()[0], normalized_left, si * 44.1, finf.window_size * 44.1);
-                    normalize_samples(
-                        fwidgets[fi]->get_channels()[1], normalized_right, si * 44.1, finf.window_size * 44.1);
-                    
+                    normalize_samples(fwidgets[fi]->get_channels()[0],
+                                      normalized_left,
+                                      si * 44.1,
+                                      finf.window_size * 44.1);
+                    normalize_samples(fwidgets[fi]->get_channels()[1],
+                                      normalized_right,
+                                      si * 44.1,
+                                      finf.window_size * 44.1);
 
                     double rms_value = 0.0;
                     double total_size = 0.0;
@@ -340,8 +453,7 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
                         if (db_val > (finf.min_threshold - finf.hysterysis))
                         {
                             // squelch to remain open
-  //                          std::cout << "Squelch remains opened" << std::endl;
-
+                            //                          std::cout << "Squelch remains opened" << std::endl;
 
                             // Update the intensity with this window's rms
                             double mult = (db_val - finf.min_threshold) /
@@ -354,12 +466,12 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
                         else
                         {
                             // close the squelch
-//                            std::cout << "Squelch closed!" << std::endl;
+                            //                            std::cout << "Squelch closed!" << std::endl;
                             filter_state[fi].open_squelch = false;
 
                             // squelch was open and now is closed - engage the hold time... if hold is zero then engage the release time
                             filter_state[fi].hold = finf.hold;
-                            if (fcompare(finf.hold,0.0))
+                            if (fcompare(finf.hold, 0.0))
                                 filter_state[fi].release = finf.release;
                         }
                     }
@@ -402,8 +514,8 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
                 }
                 else if (filter_state[fi].release > 0)
                 {
-                    filter_frame_contrib +=
-                        (double(filter_state[fi].release) / finf.release) * filter_state[fi].frame_contrib_hold;
+                    filter_frame_contrib += (double(filter_state[fi].release) / finf.release) *
+                                            filter_state[fi].frame_contrib_hold;
                     // std::cout << "Release engaged: " << filter_state[fi].release << " at value " << filter_frame_contrib << std::endl;
                     filter_state[fi].release -= 1.0;
                 }
@@ -411,10 +523,53 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
                 {
                     filter_state[fi].frame_contrib_hold = 0;
                 }
-                
+
                 //std::cout << "Filter frame contrib:" << filter_frame_contrib << std::endl;
             }
-            double total_contrib = timer_frame_contrib + filter_frame_contrib;
+
+            double automation_contrib = 0.0;
+            for (int ai = 0; ai < awidgets.size(); ++ai)
+            {
+                QVector<double> & rdata = awidgets[ai]->recorded_data;
+                Automation_Info ainf = awidgets[ai]->get_automation_info();
+
+                if (!ainf.enabled)
+                    continue;
+                // If the current value is 1.0 and the previous value is 0.0, for as long as previous values are 0.0
+                // apply the ramp up time...
+                //                int ramp_up = ainf.ramp_up;
+                // int copy_si = si;
+                // while (copy_si < rdata.size() && fcompare(rdata[copy_si], 0.0) && copy_si <= ramp_up)
+                // {
+                //     ++copy_si;
+                // }
+
+                // ramp up, down, or hold?
+                if (fcompare(rdata[si], 0.0))
+                {
+                    if ((si > 0) && fcompare(rdata[si - 1], 1.0))
+                        automation_state[ai].hold = ainf.hold_time;
+
+                    if (automation_state[ai].hold > 0)
+                    {
+                        automation_contrib = 1.0;
+                        automation_state[ai].hold -= 1.0;
+                        if (automation_state[ai].hold <= 0.0)
+                            automation_state[ai].ramp_down = ainf.ramp_down;
+                    }
+                    else if (automation_state[ai].ramp_down > 0)
+                    {
+                        automation_contrib = automation_state[ai].ramp_down / ainf.ramp_down;
+                        automation_state[ai].ramp_down -= 1.0;
+                    }
+                }
+                else
+                {
+                    automation_contrib = rdata[si];
+                }
+            }
+
+            double total_contrib = timer_frame_contrib + filter_frame_contrib + automation_contrib;
             total_contrib = total_contrib * (LIGHT_LEVEL_MAX - LIGHT_LEVEL_MIN) + LIGHT_LEVEL_MIN;
             total_contrib = std::clamp(total_contrib, LIGHT_LEVEL_MIN, LIGHT_LEVEL_MAX);
             uint8_t rounded_int = std::lround(total_contrib);
@@ -424,6 +579,11 @@ void Main_Window::on_actionRebuild_Light_Data_triggered()
         for (int fi = 0; fi < fwidgets.size(); ++fi)
             fwidgets[fi]->calculate_statistics(filter_state[fi].window_rms_vals);
     }
+
+    play_slider_->setMaximum(light_data_.sample_cnt);
+    play_slider_->setTickInterval(5000);
+    play_slider_->setTickPosition(QSlider::TicksBelow);
+    play_slider_->setValue(0);
 
     if (ed_socket_->state() != QAbstractSocket::ConnectedState)
     {
@@ -548,8 +708,10 @@ void Main_Window::load_audio_data()
 
 void Main_Window::on_actionOpen_Audio_File_triggered()
 {
-    song_fname = QFileDialog::getOpenFileName(
-        this, "Open Audio File", "../import", "Audio Files (*.wav *.mp3)");
+    song_fname = QFileDialog::getOpenFileName(this,
+                                              "Open Audio File",
+                                              "/home/daniel/Documents/Code/XMas_Lights/import",
+                                              "Audio Files (*.wav *.mp3)");
 }
 
 void Main_Window::setup_light_graphics_()
@@ -615,22 +777,37 @@ void Main_Window::save_config_to_file(const QString & filename)
 {
     if (filename.isEmpty())
         return;
+
     QFile json_file(filename);
-    if (json_file.open(QIODevice::WriteOnly))
+    QFile json_file_dat(filename + ".dat");
+
+    if (json_file.open(QIODevice::WriteOnly) && json_file_dat.open(QIODevice::WriteOnly))
     {
         QVariantMap vm;
+        QVariantMap vm2;
+
         variant_map_archive ar;
         ar.io = PUP_OUT;
-        ar.top_level = &vm;
+        
         for (int i = 0; i < lwidgets.size(); ++i)
         {
+            ar.top_level = &vm;
             pack_unpack(ar, song_fname, var_info("song_fname", QVariantMap()));
             pack_unpack(ar,
                         *lwidgets[i],
                         var_info("Light_Widget[" + QString::number(i) + "]", QVariantMap()));
+
+            ar.top_level = &vm2;
+            auto awidgets = lwidgets[i]->get_automation_widgets();
+            for (int j = 0; j < awidgets.size(); ++j)
+            {
+                pack_unpack(ar, awidgets[j]->recorded_data, var_info("Light_Widget[" + QString::number(i) + "].data(" + QString::number(j) + ")", QVariantMap()));
+            }
         }
         QJsonDocument doc = QJsonDocument::fromVariant(vm);
+        QJsonDocument doc2 = QJsonDocument::fromVariant(vm2);
         json_file.write(doc.toJson());
+        json_file_dat.write(doc2.toBinaryData());
     }
 }
 
@@ -639,21 +816,34 @@ void Main_Window::load_config_from_file(const QString & filename)
     if (filename.isEmpty())
         return;
     QFile json_file(filename);
-    if (json_file.open(QIODevice::ReadOnly))
+    QFile json_file_dat(filename + ".dat");
+    if (json_file.open(QIODevice::ReadOnly) && json_file_dat.open(QIODevice::ReadOnly))
     {
         QByteArray fdata(json_file.readAll());
+        QByteArray fdata2(json_file_dat.readAll());
+
         QJsonDocument doc = QJsonDocument::fromJson(fdata);
+        QJsonDocument doc2 = QJsonDocument::fromBinaryData(fdata2);
+
         QVariantMap vm = doc.toVariant().toMap();
+        QVariantMap vm2 = doc2.toVariant().toMap();
 
         variant_map_archive ar;
         ar.io = PUP_IN;
-        ar.top_level = &vm;
         for (int i = 0; i < lwidgets.size(); ++i)
         {
+            ar.top_level = &vm;
             pack_unpack(ar, song_fname, var_info("song_fname", QVariantMap()));
             pack_unpack(ar,
                         *lwidgets[i],
                         var_info("Light_Widget[" + QString::number(i) + "]", QVariantMap()));
+
+            ar.top_level = &vm2;
+            auto awidgets = lwidgets[i]->get_automation_widgets();
+            for (int j = 0; j < awidgets.size(); ++j)
+            {
+                pack_unpack(ar, awidgets[j]->recorded_data, var_info("Light_Widget[" + QString::number(i) + "].data(" + QString::number(j) + ")", QVariantMap()));
+            }
         }
     }
 }
@@ -680,4 +870,20 @@ void Main_Window::on_actionLoad_Configuration_triggered()
 FMOD::System * Main_Window::get_audio_system()
 {
     return audio_system_;
+}
+
+void Main_Window::on_actionArm_Record_triggered()
+{
+    keys_.clear();
+    for (int i = 0; i < lwidgets.size(); ++i)
+    {
+        auto awidgets = lwidgets[i]->get_automation_widgets();
+        for (int j = 0; j < awidgets.size(); ++j)
+        {
+            Automation_Info ainf = awidgets[j]->get_automation_info();
+            if (ainf.key_code != 0)
+                keys_[ainf.key_code] = false;
+            awidgets[j]->recorded_data.resize(get_sample_count());
+        }
+    }
 }

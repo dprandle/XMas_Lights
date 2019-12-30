@@ -20,7 +20,10 @@ Filter_Widget::Filter_Widget(QWidget * parent)
       channels()
 {
     ui->setupUi(this);
-    connect(ui->comboBox_filter_type, qOverload<int>(&QComboBox::currentIndexChanged), this, &Filter_Widget::adjust_ui);
+    connect(ui->comboBox_filter_type,
+            qOverload<int>(&QComboBox::currentIndexChanged),
+            this,
+            &Filter_Widget::adjust_ui);
 }
 
 void Filter_Widget::adjust_ui(int ci)
@@ -40,8 +43,8 @@ void Filter_Widget::adjust_ui(int ci)
     {
         ui->label_sb_ripple->setText("Stob Band (dB)");
     }
-    
-    if (((ci+1) % 3) == 0)
+
+    if (((ci + 1) % 3) == 0)
     {
         ui->label_center_freq->setText("Center (Hz)");
         ui->label_bw->setVisible(true);
@@ -97,7 +100,7 @@ Filter_Info Filter_Widget::get_filter_info()
     finf.hysterysis = ui->spinBox_hysterysis->value();
     finf.window_size = ui->spinBox_win_size->value();
     finf.duration = ui->spinBox_duration->value();
-
+    finf.enabled = ui->checkBox_enabled->isChecked();
     return finf;
 }
 
@@ -183,8 +186,6 @@ void Filter_Widget::filter_audio(uint32_t sample_count,
     }
     }
 
-    //filter.setup(10, sample_rate, finf.center_freq, finf.bandwidth);
-
     for (unsigned int j = 0; j < sample_count; ++j)
     {
         filtered_interleaved_audio_[j] = channels[0][j];
@@ -260,6 +261,7 @@ void Filter_Widget::set_from_filter_info(const Filter_Info & finf)
     ui->spinBox_win_size->setValue(finf.window_size);
     ui->spinBox_duration->setValue(finf.duration);
     ui->spinBox_sb_ripple->setValue(finf.sb_ripple);
+    ui->checkBox_enabled->setChecked(finf.enabled);
 }
 
 void Filter_Widget::calculate_statistics(const QVector<double> & rms_values)
@@ -301,4 +303,25 @@ void Filter_Widget::calculate_statistics(const QVector<double> & rms_values)
 void Filter_Widget::on_pushButton_delete_clicked()
 {
     emit delete_me(index);
+}
+
+void Filter_Widget::on_checkBox_enabled_stateChanged(int new_state)
+{
+    bool new_val(new_state == Qt::Checked);
+    ui->comboBox_filter_type->setEnabled(new_val);
+    ui->comboBox_source->setEnabled(new_val);
+    ui->spinBox_center_freq->setEnabled(new_val);
+    ui->spinBox_bandwidth->setEnabled(new_val);
+    ui->spinBox_order->setEnabled(new_val);
+    ui->spinBox_init_delay->setEnabled(new_val);
+    ui->spinBox_hold->setEnabled(new_val);
+    ui->spinBox_release->setEnabled(new_val);
+    ui->doubleSpinBox_min_int->setEnabled(new_val);
+    ui->doubleSpinBox_max_int->setEnabled(new_val);
+    ui->spinBox_min_threshold->setEnabled(new_val);
+    ui->spinBox_max_threshold->setEnabled(new_val);
+    ui->spinBox_hysterysis->setEnabled(new_val);
+    ui->spinBox_win_size->setEnabled(new_val);
+    ui->spinBox_duration->setEnabled(new_val);
+    ui->spinBox_sb_ripple->setEnabled(new_val);
 }
