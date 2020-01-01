@@ -2,13 +2,13 @@
     "Light_Widget[0]": {
         "Automation_Info": [
             {
-                "enabled": false,
+                "enabled": true,
                 "hold_time": 10,
                 "key_code": 65,
                 "ramp_down": 0,
                 "ramp_up": 0,
                 "rec_mode": 1,
-                "record_armed": true
+                "record_armed": false
             }
         ],
         "Filters": [
@@ -19,13 +19,13 @@
     "Light_Widget[1]": {
         "Automation_Info": [
             {
-                "enabled": false,
+                "enabled": true,
                 "hold_time": 10,
                 "key_code": 83,
                 "ramp_down": 0,
                 "ramp_up": 0,
                 "rec_mode": 1,
-                "record_armed": true
+                "record_armed": false
             }
         ],
         "Filters": [
@@ -36,13 +36,13 @@
     "Light_Widget[2]": {
         "Automation_Info": [
             {
-                "enabled": false,
+                "enabled": true,
                 "hold_time": 10,
                 "key_code": 68,
                 "ramp_down": 0,
                 "ramp_up": 0,
                 "rec_mode": 1,
-                "record_armed": true
+                "record_armed": false
             }
         ],
         "Filters": [
@@ -53,13 +53,13 @@
     "Light_Widget[3]": {
         "Automation_Info": [
             {
-                "enabled": false,
+                "enabled": true,
                 "hold_time": 10,
                 "key_code": 65,
                 "ramp_down": 0,
                 "ramp_up": 0,
                 "rec_mode": 1,
-                "record_armed": true
+                "record_armed": false
             }
         ],
         "Filters": [
@@ -76,7 +76,7 @@
                 "ramp_down": 0,
                 "ramp_up": 0,
                 "rec_mode": 1,
-                "record_armed": true
+                "record_armed": false
             }
         ],
         "Filters": [
